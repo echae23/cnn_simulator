@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNN 시뮬레이터 — 이미지가 숫자가 되고, 필터를 지나 특징이 되기까지</title>
+<style>
+  :root{
+    --ink:#1b2430; --muted:#5b6875; --line:#d7dee6; --bg:#f4f7fa;
+    --navy:#1f4e79; --blue:#2e7dd1; --red:#c0392b; --green:#1e8e5a; --amber:#e0a500;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+       font-family:'Pretendard','Malgun Gothic','맑은 고딕',system-ui,sans-serif;
+       font-size:16px; line-height:1.6}
+  header{background:var(--navy); color:#fff; padding:18px 24px 16px}
+  header h1{margin:0; font-size:22px}
+  header p{margin:4px 0 0; font-size:14px; opacity:.88}
+
+  .app{display:flex; align-items:flex-start}
+  .side{position:sticky; top:0; align-self:flex-start; flex:0 0 272px; width:272px;
+        height:100vh; overflow-y:auto; background:#fff;
+        border-right:1px solid var(--line); padding:18px 14px 30px}
+  .side .grp{font-size:12.5px; color:var(--muted); font-weight:700;
+             margin:16px 0 7px 6px; letter-spacing:.02em}
+  .side .grp:first-child{margin-top:0}
+  .side a{display:block; padding:11px 13px; border-radius:10px; text-decoration:none;
+          color:var(--ink); font-weight:700; font-size:14.5px; margin-bottom:4px; line-height:1.4}
+  .side a small{display:block; font-weight:400; font-size:12.5px; color:var(--muted); margin-top:2px}
+  .side a:hover{background:#eef4fa}
+  .side a.on{background:var(--navy); color:#fff}
+  .side a.on small{color:#ffffffcc}
+  main{flex:1 1 auto; min-width:0; padding:22px 26px 70px; max-width:1240px; margin:0}
+  @media (max-width:900px){
+    .app{flex-direction:column}
+    .side{position:static; width:100%; flex:none; height:auto; border-right:0;
+          border-bottom:1px solid var(--line)}
+    .side a{display:inline-block; margin:0 4px 4px 0}
+    .side a small{display:none}
+    main{padding:18px 16px 60px}
+  }
+
+  section{display:none}
+  section.on{display:block}
+  .step{background:#fff; border:1px solid var(--line); border-radius:14px;
+        padding:16px 18px; margin-bottom:20px}
+  .step > h2{margin:0 0 4px; font-size:20px; color:var(--navy)}
+  .step > h2 .no{display:inline-block; background:var(--navy); color:#fff; border-radius:8px;
+                 padding:1px 11px; font-size:16px; margin-right:9px}
+  .lead{margin:0 0 14px; font-size:15px; color:var(--muted)}
+  .grid{display:grid; grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr);
+        gap:18px; align-items:start}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; align-items:start}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start}
+  @media (max-width:940px){ .grid,.grid2,.grid3{grid-template-columns:1fr} }
+  .panel{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+  .panel h3{margin:0 0 8px; font-size:15px; color:var(--navy)}
+  .panel h3 .sz{float:right; font-weight:700; color:var(--blue);
+                font-variant-numeric:tabular-nums; font-size:13.5px}
+
+  canvas.gridcv{width:100%; height:auto; display:block; border-radius:8px;
+                background:#fff; border:1px solid var(--line); cursor:crosshair}
+  canvas.plain{width:100%; height:auto; display:block; border-radius:8px;
+               background:#000; border:1px solid var(--line)}
+
+  .ctrl{margin:12px 0}
+  .ctrl label{display:block; font-weight:700; font-size:14px; margin-bottom:3px}
+  .ctrl .val{color:var(--blue); font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%; accent-color:var(--blue)}
+  .btns{display:flex; flex-wrap:wrap; gap:7px; margin-top:10px}
+  button{font:inherit; font-weight:700; font-size:13.5px; cursor:pointer;
+         border:1px solid var(--navy); background:#fff; color:var(--navy);
+         border-radius:9px; padding:8px 12px}
+  button.on{background:var(--navy); color:#fff}
+  button.go{background:var(--green); border-color:var(--green); color:#fff}
+  button.sm{padding:5px 9px; font-size:12.5px}
+
+  .kbox{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; max-width:230px}
+  .kbox input{width:100%; text-align:center; font:inherit; font-weight:700; font-size:15px;
+              font-variant-numeric:tabular-nums; border:1px solid var(--line);
+              border-radius:8px; padding:8px 2px; color:var(--navy); background:#f7f9fc}
+  .kbox input:focus{outline:2px solid var(--blue); background:#fff}
+
+  .exp{background:#11212f; color:#e6edf3; border-radius:10px; padding:14px 16px; margin:10px 0 0;
+       font-family:'D2Coding',Consolas,monospace; font-size:14.5px; line-height:1.85;
+       white-space:pre-wrap; overflow-x:auto}
+  .exp .g{color:#7fd6a8; font-weight:700}
+  .exp .r{color:#ff9b8f; font-weight:700}
+  .exp .y{color:#ffd479; font-weight:700}
+  .exp .c{color:#8ecdf0; font-weight:700}
+
+  .eqbox{background:#eef4fa; border:1px solid #cddff0; border-radius:10px;
+         padding:11px 14px; margin:10px 0 0; font-size:15px; font-weight:700; color:var(--navy)}
+  .eqbox small{display:block; font-weight:400; font-size:13.5px; color:var(--muted); margin-top:4px}
+  .kpi{background:#eef4fa; border:1px solid #cddff0; border-radius:12px; padding:11px 12px;
+       text-align:center}
+  .kpi small{display:block; font-size:12.5px; color:var(--muted); font-weight:700}
+  .kpi .big{font-size:26px; font-weight:800; color:var(--navy); font-variant-numeric:tabular-nums}
+  .kpirow{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px}
+
+  .say{margin-top:12px; padding:12px 15px; border-radius:10px; font-weight:700; font-size:15.5px;
+       border-left:6px solid var(--blue); background:#eaf3fc}
+  .say.good{border-color:var(--green); background:#e8f6ef}
+  .say.warn{border-color:var(--amber); background:#fff8e2}
+  .say.bad{border-color:var(--red); background:#fdeceb}
+  .say small{display:block; font-weight:400; font-size:13.5px; color:var(--muted); margin-top:4px}
+
+  .tip{margin-top:12px; padding:12px 14px; background:#fff8e2; border:1px solid #f0dca4;
+       border-radius:10px; font-size:14.5px}
+  .tip b{color:#8a6100}
+  .tip ul{margin:6px 0 0 18px; padding:0}
+  .tip li{margin-bottom:3px}
+  .mission{margin-top:12px; padding:12px 14px; background:#fdeceb; border:1px solid #f0bdb7;
+           border-radius:10px; font-size:14.5px}
+  .mission b{color:var(--red)}
+  .mission ul{margin:6px 0 0 18px; padding:0}
+  .mission li{margin-bottom:3px}
+  .note{font-size:13.5px; color:var(--muted); margin-top:6px}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:7px}
+  .legend i{display:inline-block; width:13px; height:13px; border-radius:3px;
+            border:1px solid var(--line); vertical-align:-2px; margin-right:4px}
+
+  table{width:100%; border-collapse:collapse; font-size:14px; margin-top:8px}
+  th,td{border:1px solid var(--line); padding:6px 8px; text-align:center}
+  th{background:#eef4fa; color:var(--navy)}
+  td.n{font-variant-numeric:tabular-nums}
+  tr.hot td{background:#fff3cd; font-weight:700}
+  .tw{overflow-x:auto}
+  .flatstrip{display:block; width:100%; height:auto; border:1px solid var(--line);
+             border-radius:8px; background:#fff; margin-top:8px}
+  .arrow{text-align:center; color:var(--navy); font-weight:800; font-size:22px; padding:6px 0}
+  details{margin-top:12px; background:#f7f9fc; border:1px solid var(--line);
+          border-radius:10px; padding:10px 14px}
+  summary{font-weight:700; color:var(--navy); cursor:pointer; font-size:14.5px}
+  .filerow{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px}
+  input[type=file]{font:inherit; font-size:13px; max-width:100%}
+  .drawwrap{position:relative}
+  .pipe{display:flex; gap:8px; align-items:flex-start; overflow-x:auto; padding-bottom:6px}
+  .pipe .cell{flex:0 0 auto; text-align:center; min-width:96px}
+  .pipe .cell canvas{width:96px; height:96px; image-rendering:pixelated;
+                     border:1px solid var(--line); border-radius:6px; background:#fff; display:block}
+  .pipe .cell .cap{font-size:12px; font-weight:700; color:var(--navy); margin-top:5px; line-height:1.35}
+  .pipe .cell .cap span{display:block; font-weight:400; color:var(--muted); font-size:11.5px}
+  .pipe .sep{flex:0 0 auto; align-self:center; color:var(--navy); font-weight:800; font-size:20px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CNN 시뮬레이터 — 이미지가 숫자가 되고, 필터를 지나 특징이 되기까지</h1>
+  <p>Ⅳ. 인공지능과 학습 · 3장 컴퓨터 비전의 시작 — 왼쪽에서 단계를 골라 차례로 따라가 보자</p>
+</header>
+
+<div class="app">
+<aside class="side">
+  <div class="grp">이미지를 다루는 순서</div>
+  <a href="#pixel" data-tab="pixel" class="on">① 이미지 → 숫자<small>컴퓨터가 보는 것은 픽셀 값이다</small></a>
+  <a href="#conv"  data-tab="conv">② 필터와 합성곱<small>3×3 창을 밀며 곱하고 더한다</small></a>
+  <a href="#pool"  data-tab="pool">③ ReLU와 풀링<small>Max · Average를 골라 비교</small></a>
+  <div class="grp">전체 그림</div>
+  <a href="#pipe"  data-tab="pipe">④ 전체 파이프라인<small>입력 → 특징 → 판단까지</small></a>
+  <a href="#shift" data-tab="shift">⑤ 왜 CNN인가<small>글자를 옮겨 보면 알 수 있다</small></a>
+</aside>
+
+<main>
+
+<!-- ══════════════ ① 이미지 → 숫자 ══════════════ -->
+<section id="pixel" class="on">
+<div class="step">
+  <h2><span class="no">1</span>컴퓨터가 보는 것은 그림이 아니라 숫자입니다</h2>
+  <p class="lead">사진을 하나 고르거나, 직접 그리거나, 파일을 올려 보세요.
+     오른쪽 격자의 <b>숫자 하나가 픽셀 한 칸</b>입니다. 0은 검정, 1은 흰색입니다.</p>
+
+  <div class="grid">
+    <div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>원본 (직접 그릴 수 있음)</h3>
+          <canvas id="p_draw" class="plain" width="280" height="280"></canvas>
+          <div class="btns">
+            <button class="sm" id="p_clear">지우기</button>
+            <button class="sm" id="p_invert">밝기 반전</button>
+          </div>
+          <div class="note">캔버스 위에서 마우스를 끌면 흰 붓으로 그려집니다.</div>
+        </div>
+        <div class="panel">
+          <h3>픽셀 값 <span class="sz" id="p_size">16 × 16</span></h3>
+          <canvas id="p_grid" class="gridcv" width="280" height="280"></canvas>
+          <div class="legend">
+            <span><i style="background:#000"></i>0 = 검정</span>
+            <span><i style="background:#888"></i>0.5 = 회색</span>
+            <span><i style="background:#fff"></i>1 = 흰색</span>
+          </div>
+          <div class="note" id="p_numnote"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h3>MLP는 이 격자를 한 줄로 폅니다 — Flatten</h3>
+        <canvas id="p_flat" class="flatstrip" width="1000" height="46"></canvas>
+        <div class="eqbox">
+          16 × 16 격자 &nbsp;→&nbsp; 길이 <b id="p_len">256</b> 짜리 한 줄
+          <small>이 순간 &quot;이 픽셀 옆에 저 픽셀이 있었다&quot;는 <b>위치 관계가 사라집니다.</b>
+                 MLP는 이 한 줄만 보고 판단해야 합니다.</small>
+        </div>
+        <div class="say" id="p_say">격자 위에 마우스를 올리면 그 칸이 한 줄에서 몇 번째로 가는지 보여 줍니다.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>조작</h3>
+      <label style="font-weight:700; font-size:14px">그림 고르기</label>
+      <div class="btns" id="p_samples">
+        <button class="on" data-s="seven">숫자 7</button>
+        <button data-s="cross">십자</button>
+        <button data-s="diag">대각선</button>
+        <button data-s="circle">동그라미</button>
+        <button data-s="letterA">글자 A</button>
+      </div>
+
+      <div class="filerow">
+        <label style="font-weight:700; font-size:14px; margin:0">사진 올리기</label>
+        <input type="file" id="p_file" accept="image/*">
+      </div>
+      <div class="note">올린 사진은 흑백으로 바꾼 뒤 격자 크기에 맞게 줄여서 씁니다.</div>
+
+      <div class="ctrl">
+        <label>격자 크기 <span class="val" id="p_nlab">16 × 16</span></label>
+        <input type="range" id="p_n" min="8" max="28" step="4" value="16">
+        <div class="note">28 × 28 은 EMNIST·MNIST가 실제로 쓰는 크기입니다.</div>
+      </div>
+
+      <div class="btns">
+        <button id="p_num" class="on">숫자 보이기</button>
+        <button id="p_255">0~255 로 보기</button>
+      </div>
+
+      <div class="tip">
+        <b>수업 팁</b>
+        <ul>
+          <li>먼저 &quot;컴퓨터에게 이 그림을 어떻게 설명하지?&quot;를 물어보세요.
+              숫자 격자를 보여 주면 대부분 &quot;아 그냥 숫자구나&quot;라고 반응합니다.</li>
+          <li>격자 크기를 8로 줄이면 사람도 무엇인지 못 알아봅니다.
+              &quot;해상도를 줄이면 왜 알아보기 어려울까?&quot;가 좋은 질문거리입니다.</li>
+          <li>Flatten 띠를 보여 주며 <b>&quot;여기서 위아래 관계가 사라진다&quot;</b>를 반드시 짚어 주세요.
+              3장 전체가 이 한 문장에서 출발합니다.</li>
+        </ul>
+      </div>
+      <div class="note" style="margin-top:10px">학습지 연계 — 탐구 6 기준 ① &#39;데이터의 모양이 신경망의 구조를 결정한다&#39;</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ ② 필터와 합성곱 ══════════════ -->
+<section id="conv">
+<div class="step">
+  <h2><span class="no">2</span>필터를 밀면서 곱하고 더한다 — 합성곱(Convolution)</h2>
+  <p class="lead">3×3 짜리 작은 창(필터)을 이미지 위에서 한 칸씩 밀며,
+     <b>겹친 9칸을 각각 곱해서 모두 더합니다.</b> 그 결과 하나가 특징맵의 한 칸이 됩니다.
+     오른쪽 특징맵에 마우스를 올리면 그 칸이 어디서 나왔는지 보여 줍니다.</p>
+
+  <div class="grid">
+    <div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>입력 <span class="sz" id="c_insz">16 × 16</span></h3>
+          <canvas id="c_in" class="gridcv" width="300" height="300"></canvas>
+          <div class="note">노란 테두리가 지금 필터가 덮고 있는 자리입니다.</div>
+        </div>
+        <div class="panel">
+          <h3>특징맵 (합성곱 결과) <span class="sz" id="c_outsz">14 × 14</span></h3>
+          <canvas id="c_out" class="gridcv" width="300" height="300"></canvas>
+          <div class="legend">
+            <span><i style="background:#2e7dd1"></i>음수</span>
+            <span><i style="background:#fff"></i>0</span>
+            <span><i style="background:#c0392b"></i>양수</span>
+            <span>&nbsp;진할수록 반응이 큼</span>
+          </div>
+        </div>
+      </div>
+
+      <pre class="exp" id="c_calc">특징맵 위에 마우스를 올려 보세요.</pre>
+
+      <div class="eqbox">
+        출력 크기 = (입력 <b id="c_e1">16</b> − 필터 <b id="c_e2">3</b> + 2×패딩 <b id="c_e3">0</b>) ÷ 스트라이드 <b id="c_e4">1</b> + 1 =
+        <b id="c_e5">14</b>
+        <small>패딩을 1로 주면 크기가 그대로 유지됩니다(3×3 필터 기준). 파이토치의
+               <code>nn.Conv2d(1, 32, 3, padding=1)</code> 이 바로 이 설정입니다.</small>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>조작</h3>
+      <label style="font-weight:700; font-size:14px">필터 고르기</label>
+      <div class="btns" id="c_kernels">
+        <button class="on" data-k="sobelx">세로선 찾기</button>
+        <button data-k="sobely">가로선 찾기</button>
+        <button data-k="lap">윤곽선</button>
+        <button data-k="blur">흐리게</button>
+        <button data-k="sharp">선명하게</button>
+        <button data-k="emboss">엠보스</button>
+        <button data-k="id">그대로</button>
+      </div>
+
+      <label style="font-weight:700; font-size:14px; margin-top:12px; display:block">
+        필터 값 직접 고치기 (3 × 3)</label>
+      <div class="kbox" id="c_kbox"></div>
+      <div class="note">숫자를 바꾸면 곧바로 특징맵이 다시 계산됩니다.</div>
+
+      <div class="ctrl">
+        <label>패딩(Padding) <span class="val" id="c_padlab">0</span></label>
+        <input type="range" id="c_pad" min="0" max="2" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <label>스트라이드(Stride) — 몇 칸씩 밀까 <span class="val" id="c_stlab">1</span></label>
+        <input type="range" id="c_st" min="1" max="3" step="1" value="1">
+      </div>
+
+      <div class="btns">
+        <button id="c_scan" class="go">필터가 지나가는 모습 보기</button>
+        <button id="c_relu">ReLU 적용</button>
+      </div>
+
+      <div class="say" id="c_say"></div>
+
+      <div class="mission">
+        <b>[미션] 숫자만 바꿔 보세요</b>
+        <ul>
+          <li>&#39;세로선 찾기&#39; 필터에서 <b>왼쪽 열과 오른쪽 열의 부호를 서로 바꾸면</b> 특징맵이 어떻게 될까요?</li>
+          <li>필터 9칸을 <b>전부 0</b>으로 만들면? 전부 <b>1/9</b>로 만들면?</li>
+          <li>스트라이드를 2로 올리면 특징맵 크기가 왜 절반이 될까요?</li>
+        </ul>
+      </div>
+
+      <div class="tip">
+        <b>수업 팁</b>
+        <ul>
+          <li>필터 값은 <b>사람이 정하는 게 아니라 학습으로 찾아내는 값</b>입니다.
+              여기서는 이해를 위해 손으로 넣어 보는 것이라고 꼭 말해 주세요.
+              1장의 &quot;w=0.5는 어디서 나왔나&quot;와 같은 이야기입니다.</li>
+          <li>&#39;세로선 찾기&#39;를 고르고 십자 그림을 넣으면 세로 막대의 양옆만 밝아집니다.
+              &quot;필터마다 찾는 것이 다르다&quot;가 눈으로 보입니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ ③ ReLU와 풀링 ══════════════ -->
+<section id="pool">
+<div class="step">
+  <h2><span class="no">3</span>음수는 버리고(ReLU), 크기는 줄인다(Pooling)</h2>
+  <p class="lead">합성곱 결과를 그대로 쓰지 않습니다. <b>ReLU</b>로 음수를 0으로 자르고,
+     <b>풀링</b>으로 여러 칸을 한 칸으로 줄입니다.
+     아래에서 <b>Max</b>와 <b>Average</b>를 나란히 비교해 보세요.</p>
+
+  <div class="grid3">
+    <div class="panel">
+      <h3>① 합성곱 결과 <span class="sz" id="r_sz1"></span></h3>
+      <canvas id="r_conv" class="gridcv" width="260" height="260"></canvas>
+      <div class="note">파란 칸이 음수입니다.</div>
+    </div>
+    <div class="panel">
+      <h3>② ReLU 통과 <span class="sz" id="r_sz2"></span></h3>
+      <canvas id="r_relu" class="gridcv" width="260" height="260"></canvas>
+      <div class="note">음수(파랑)가 전부 0(흰색)이 되었습니다.</div>
+    </div>
+    <div class="panel">
+      <h3>③ 풀링 결과 <span class="sz" id="r_sz3"></span></h3>
+      <canvas id="r_pool" class="gridcv" width="260" height="260"></canvas>
+      <div class="note">여기에 마우스를 올려 보세요.</div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div>
+      <pre class="exp" id="r_calc">풀링 결과 위에 마우스를 올리면 어느 칸들에서 나왔는지 보여 줍니다.</pre>
+      <div class="grid2" style="margin-top:12px">
+        <div class="kpi"><small>Max Pooling 이 고른 값</small><div class="big" id="r_kmax">–</div></div>
+        <div class="kpi"><small>Average Pooling 이 낸 값</small><div class="big" id="r_kavg">–</div></div>
+      </div>
+      <div class="say" id="r_say"></div>
+    </div>
+
+    <div class="panel">
+      <h3>조작</h3>
+      <label style="font-weight:700; font-size:14px">풀링 방식</label>
+      <div class="btns" id="r_mode">
+        <button class="on" data-m="max">Max — 가장 센 값만</button>
+        <button data-m="avg">Average — 평균</button>
+      </div>
+
+      <div class="ctrl">
+        <label>풀링 창 크기 <span class="val" id="r_szlab">2 × 2</span></label>
+        <input type="range" id="r_size" min="2" max="4" step="1" value="2">
+      </div>
+      <div class="ctrl">
+        <label>스트라이드 <span class="val" id="r_stlab">2</span></label>
+        <input type="range" id="r_stride" min="1" max="4" step="1" value="2">
+      </div>
+      <div class="btns">
+        <button id="r_relutog" class="on">ReLU 켜기</button>
+      </div>
+
+      <div class="eqbox">
+        출력 크기 = (입력 <b id="r_e1"></b> − 창 <b id="r_e2"></b>) ÷ 스트라이드 <b id="r_e3"></b> + 1 = <b id="r_e4"></b>
+        <small>창 2 · 스트라이드 2 면 가로세로가 정확히 <b>절반</b>이 됩니다.
+               28 → 14 → 7 이 되는 이유가 이것입니다.</small>
+      </div>
+
+      <div class="mission">
+        <b>[미션] 두 방식을 비교해 보세요</b>
+        <ul>
+          <li>같은 자리에서 <b>Max와 Average의 값이 언제 크게 달라지나요?</b>
+              (한 칸만 아주 밝을 때를 찾아보세요)</li>
+          <li>풀링 창을 4×4로 키우면 그림이 어떻게 되나요? 무엇을 잃게 되나요?</li>
+          <li>ReLU를 끄면 Average Pooling 값이 왜 0에 가까워질까요?</li>
+        </ul>
+      </div>
+
+      <div class="tip">
+        <b>왜 Max를 더 많이 쓸까</b>
+        <ul>
+          <li>Max는 &quot;이 근처에 <b>그 특징이 있었는가</b>&quot;만 남깁니다.
+              조금 흔들려도 답이 잘 안 바뀝니다.</li>
+          <li>Average는 주변을 섞어 평균 내므로 <b>날카로운 선이 흐려집니다.</b>
+              대신 잡음에는 강합니다.</li>
+          <li>파이토치에서는 <code>nn.MaxPool2d(2)</code> · <code>nn.AvgPool2d(2)</code> 한 줄 차이입니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ ④ 전체 파이프라인 ══════════════ -->
+<section id="pipe">
+<div class="step">
+  <h2><span class="no">4</span>전체 흐름 한눈에 보기</h2>
+  <p class="lead">지금까지 본 조각들을 순서대로 이어 붙이면 그것이 CNN입니다.
+     노트북의 <code>class CNN(nn.Module)</code> 과 정확히 같은 순서입니다.</p>
+
+  <div class="panel">
+    <h3>입력부터 판단까지</h3>
+    <div class="pipe" id="pp_strip"></div>
+    <div class="note">각 칸 아래 숫자가 그 단계에서의 <b>크기</b>입니다. 필터를 지날 때마다 작아지고 두꺼워집니다.</div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div>
+      <div class="panel">
+        <h3>같은 자리를 여러 필터가 각각 다르게 본다</h3>
+        <div class="grid2" id="pp_maps"></div>
+        <div class="note" style="margin-top:8px">
+          필터 4개를 동시에 통과시킨 결과입니다. 파이토치의 <code>nn.Conv2d(1, 32, 3)</code> 은
+          이런 특징맵을 <b>32장</b> 만듭니다.
+        </div>
+      </div>
+
+      <pre class="exp" id="pp_code"></pre>
+    </div>
+
+    <div class="panel">
+      <h3>MLP와 CNN, 파라미터 수 비교</h3>
+      <div class="tw">
+        <table id="pp_tbl">
+          <thead><tr><th>모델</th><th>첫 층의 파라미터 수</th><th>무엇을 보는가</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="say good">
+        CNN은 <b>같은 필터를 이미지 전체에 돌려 씁니다.</b>
+        <small>그래서 파라미터가 훨씬 적으면서도 위치와 무관하게 같은 특징을 찾아냅니다.
+               이것을 &#39;가중치 공유(weight sharing)&#39;라고 합니다.</small>
+      </div>
+
+      <div class="ctrl" style="margin-top:14px">
+        <label>필터 개수 <span class="val" id="pp_flab">4</span></label>
+        <input type="range" id="pp_f" min="1" max="8" step="1" value="4">
+      </div>
+
+      <div class="tip">
+        <b>수업 팁</b>
+        <ul>
+          <li>왼쪽 띠를 손으로 짚으며 &quot;<b>작아지고 두꺼워진다</b>&quot;를 반복해 주세요.
+              28→14→7 계산을 칠판에서 한 번 하면 <code>7*7*64</code> 를 외울 필요가 없어집니다.</li>
+          <li>파라미터 표는 &quot;CNN이 왜 효율적인가&quot;에 대한 가장 짧은 답입니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ ⑤ 왜 CNN인가 ══════════════ -->
+<section id="shift">
+<div class="step">
+  <h2><span class="no">5</span>글자를 옆으로 밀어 보면 알 수 있습니다</h2>
+  <p class="lead">같은 글자를 몇 픽셀 옮겨 보세요.
+     <b>MLP가 보는 한 줄</b>은 완전히 다른 숫자가 되지만,
+     <b>CNN의 특징맵</b>은 모양 그대로 함께 옮겨질 뿐입니다.</p>
+
+  <div class="grid">
+    <div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>원본 이미지</h3>
+          <canvas id="s_orig" class="gridcv" width="230" height="230"></canvas>
+          <h3 style="margin-top:12px">원본의 특징맵</h3>
+          <canvas id="s_f0" class="gridcv" width="230" height="230"></canvas>
+        </div>
+        <div class="panel">
+          <h3>옮긴 이미지</h3>
+          <canvas id="s_move" class="gridcv" width="230" height="230"></canvas>
+          <h3 style="margin-top:12px">옮긴 뒤의 특징맵</h3>
+          <canvas id="s_feat" class="gridcv" width="230" height="230"></canvas>
+        </div>
+      </div>
+      <div class="note">아래 두 그림을 비교해 보세요. <b>모양은 그대로이고 위치만 옮겨졌습니다.</b></div>
+
+      <div class="kpirow">
+        <div class="kpi">
+          <small>MLP가 보는 한 줄 — 원본과 얼마나 닮았나</small>
+          <div class="big" id="s_mlp">–</div>
+        </div>
+        <div class="kpi">
+          <small>CNN 특징맵 — 모양이 얼마나 그대로인가</small>
+          <div class="big" id="s_cnn">–</div>
+        </div>
+      </div>
+      <div class="note">
+        왼쪽은 픽셀을 그대로 견준 값,
+        오른쪽은 특징맵을 <b>옮긴 만큼 되돌려 놓고</b> 견준 값입니다(코사인 유사도).
+      </div>
+
+      <div class="say" id="s_say"></div>
+    </div>
+
+    <div class="panel">
+      <h3>조작</h3>
+      <div class="ctrl">
+        <label>가로로 옮기기 <span class="val" id="s_dxlab">0 칸</span></label>
+        <input type="range" id="s_dx" min="-4" max="4" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <label>세로로 옮기기 <span class="val" id="s_dylab">0 칸</span></label>
+        <input type="range" id="s_dy" min="-4" max="4" step="1" value="0">
+      </div>
+      <div class="btns">
+        <button id="s_reset">가운데로</button>
+      </div>
+
+      <div class="eqbox">
+        CNN이 강한 이유 두 가지
+        <small>
+          <b>① 가중치 공유</b> — 같은 필터가 이미지 전체를 훑으므로, 어디에 있든 같은 특징을 찾습니다.<br>
+          <b>② 풀링</b> — 작은 흔들림을 뭉개 버려서, 조금 옮겨져도 결과가 잘 바뀌지 않습니다.
+        </small>
+      </div>
+
+      <div class="mission">
+        <b>[미션] 직접 확인하기</b>
+        <ul>
+          <li>1칸만 옮겨 보세요. MLP 쪽 숫자와 CNN 쪽 숫자 중 <b>어느 쪽이 더 많이 떨어지나요?</b></li>
+          <li>4칸까지 옮겼을 때도 특징맵의 <b>모양</b>은 그대로인지 눈으로 확인해 보세요.</li>
+        </ul>
+      </div>
+
+      <div class="tip">
+        <b>학습지 연계 — 탐구 7 개념 평가 5번</b>
+        <ul>
+          <li>&quot;같은 고양이 사진을 오른쪽으로 5픽셀 옮겼다.
+              MLP와 CNN 중 어느 쪽의 판단이 더 잘 유지되겠는가?&quot;</li>
+          <li>채점 포인트 — <b>&#39;공간 정보&#39;</b>라는 낱말을 쓰고,
+              MLP는 평탄화하며 위치 관계를 잃는다는 근거를 대면 상(上).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+</main>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════ 공통 도구 ═══════════════ */
+const $ = (id) => document.getElementById(id);
+
+const KERNELS = {
+  sobelx: {name:"세로선 찾기",  v:[-1,0,1, -2,0,2, -1,0,1],
+           why:"왼쪽과 오른쪽의 밝기 차이를 재므로 <b>세로 방향 경계</b>에서 값이 커집니다."},
+  sobely: {name:"가로선 찾기",  v:[-1,-2,-1, 0,0,0, 1,2,1],
+           why:"위와 아래의 밝기 차이를 재므로 <b>가로 방향 경계</b>에서 값이 커집니다."},
+  lap:    {name:"윤곽선",       v:[0,-1,0, -1,4,-1, 0,-1,0],
+           why:"가운데와 이웃 네 칸의 차이를 재므로 <b>모든 방향의 경계</b>가 드러납니다."},
+  blur:   {name:"흐리게",       v:[1/9,1/9,1/9, 1/9,1/9,1/9, 1/9,1/9,1/9],
+           why:"9칸의 <b>평균</b>을 냅니다. 잡음이 줄지만 선이 뭉개집니다."},
+  sharp:  {name:"선명하게",     v:[0,-1,0, -1,5,-1, 0,-1,0],
+           why:"가운데를 키우고 주변을 깎아 <b>경계를 도드라지게</b> 만듭니다."},
+  emboss: {name:"엠보스",       v:[-2,-1,0, -1,1,1, 0,1,2],
+           why:"한쪽 방향의 차이만 남겨 <b>돋을새김처럼</b> 보이게 합니다."},
+  id:     {name:"그대로",       v:[0,0,0, 0,1,0, 0,0,0],
+           why:"가운데 값만 그대로 통과시킵니다. <b>아무것도 하지 않는 필터</b>입니다."}
+};
+
+/* 원본 이미지 상태 : 항상 0~1 사이 값 */
+const SRC = { n:16, data:null, invert:false, name:"seven" };
+
+function idx(x, y, n){ return y*n + x; }
+
+/* ── 샘플 그림을 캔버스에 그려 만든다 ── */
+function makeSample(name, n){
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = n;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#000"; g.fillRect(0, 0, n, n);
+  g.fillStyle = "#fff"; g.strokeStyle = "#fff";
+  g.lineCap = "round"; g.lineJoin = "round";
+  const u = n / 16;                      // 16 기준으로 그린 뒤 크기에 맞춰 늘린다
+
+  if(name === "cross"){
+    g.fillRect(7*u, 2*u, 2*u, 12*u);
+    g.fillRect(2*u, 7*u, 12*u, 2*u);
+  } else if(name === "diag"){
+    g.lineWidth = 2.2*u;
+    g.beginPath(); g.moveTo(2.5*u, 2.5*u); g.lineTo(13.5*u, 13.5*u); g.stroke();
+  } else if(name === "circle"){
+    g.lineWidth = 2.2*u;
+    g.beginPath(); g.arc(8*u, 8*u, 5*u, 0, Math.PI*2); g.stroke();
+  } else {
+    const ch = (name === "letterA") ? "A" : "7";
+    g.font = "bold " + (13*u) + "px 'Malgun Gothic', Arial, sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(ch, 8*u, 8.4*u);
+  }
+
+  const d = g.getImageData(0, 0, n, n).data;
+  const out = new Float32Array(n*n);
+  for(let i = 0; i < n*n; i++){
+    out[i] = (0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]) / 255;
+  }
+  return out;
+}
+
+/* ── 업로드한 사진을 n×n 흑백으로 ── */
+function imageToArray(img, n){
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = n;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#000"; g.fillRect(0, 0, n, n);
+  const s = Math.min(img.width, img.height);            // 가운데를 정사각형으로 잘라 씀
+  g.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, n, n);
+  const d = g.getImageData(0, 0, n, n).data;
+  const out = new Float32Array(n*n);
+  for(let i = 0; i < n*n; i++){
+    out[i] = (0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]) / 255;
+  }
+  return out;
+}
+
+/* ── 연산 ── */
+function conv2d(src, n, ker, K, stride, pad){
+  const outN = Math.floor((n - K + 2*pad) / stride) + 1;
+  const out = new Float32Array(Math.max(0, outN*outN));
+  for(let oy = 0; oy < outN; oy++){
+    for(let ox = 0; ox < outN; ox++){
+      let s = 0;
+      for(let ky = 0; ky < K; ky++){
+        for(let kx = 0; kx < K; kx++){
+          const iy = oy*stride + ky - pad, ix = ox*stride + kx - pad;
+          const v = (iy < 0 || ix < 0 || iy >= n || ix >= n) ? 0 : src[idx(ix, iy, n)];
+          s += v * ker[ky*K + kx];
+        }
+      }
+      out[oy*outN + ox] = s;
+    }
+  }
+  return { data: out, n: outN };
+}
+
+function relu(a){
+  const out = new Float32Array(a.length);
+  for(let i = 0; i < a.length; i++) out[i] = a[i] > 0 ? a[i] : 0;
+  return out;
+}
+
+function pool2d(src, n, size, stride, mode){
+  const outN = Math.floor((n - size) / stride) + 1;
+  const out = new Float32Array(Math.max(0, outN*outN));
+  for(let oy = 0; oy < outN; oy++){
+    for(let ox = 0; ox < outN; ox++){
+      let best = -Infinity, sum = 0, cnt = 0;
+      for(let ky = 0; ky < size; ky++){
+        for(let kx = 0; kx < size; kx++){
+          const v = src[idx(ox*stride + kx, oy*stride + ky, n)];
+          if(v > best) best = v;
+          sum += v; cnt++;
+        }
+      }
+      out[oy*outN + ox] = (mode === "max") ? best : sum/cnt;
+    }
+  }
+  return { data: out, n: outN };
+}
+
+function shiftImage(src, n, dx, dy){
+  const out = new Float32Array(n*n);
+  for(let y = 0; y < n; y++){
+    for(let x = 0; x < n; x++){
+      const sx = x - dx, sy = y - dy;
+      out[idx(x, y, n)] = (sx < 0 || sy < 0 || sx >= n || sy >= n) ? 0 : src[idx(sx, sy, n)];
+    }
+  }
+  return out;
+}
+
+/* ── 격자 그리기 ── */
+function drawGrid(cv, data, n, opt){
+  opt = opt || {};
+  const cell = Math.max(9, Math.floor((opt.target || 300) / n));
+  cv.width = cv.height = n * cell;
+  const g = cv.getContext("2d");
+  g.clearRect(0, 0, cv.width, cv.height);
+
+  let scale = 1;
+  if(opt.signed){
+    let m = 0;
+    for(let i = 0; i < data.length; i++) m = Math.max(m, Math.abs(data[i]));
+    scale = m > 1e-9 ? m : 1;
+  }
+
+  const showNum = opt.num && cell >= 19;
+  g.font = "bold " + Math.max(8, Math.floor(cell*0.34)) + "px Consolas, monospace";
+  g.textAlign = "center"; g.textBaseline = "middle";
+
+  for(let y = 0; y < n; y++){
+    for(let x = 0; x < n; x++){
+      const v = data[idx(x, y, n)];
+      let fill, lum;
+      if(opt.signed){
+        const t = Math.max(-1, Math.min(1, v/scale));
+        if(t >= 0){ fill = "rgb(255," + Math.round(255-155*t) + "," + Math.round(255-190*t) + ")"; lum = 1-0.55*t; }
+        else      { fill = "rgb(" + Math.round(255+ 209*t) + "," + Math.round(255+130*t) + ",255)"; lum = 1+0.5*t; }
+      } else {
+        const t = Math.max(0, Math.min(1, v));
+        const c = Math.round(t*255);
+        fill = "rgb(" + c + "," + c + "," + c + ")"; lum = t;
+      }
+      g.fillStyle = fill;
+      g.fillRect(x*cell, y*cell, cell, cell);
+      if(cell >= 12){
+        g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 1;
+        g.strokeRect(x*cell + .5, y*cell + .5, cell - 1, cell - 1);
+      }
+      if(showNum){
+        g.fillStyle = lum > 0.55 ? "#1b2430" : "#ffffff";
+        let s;
+        if(opt.mode255) s = String(Math.round(Math.max(0, Math.min(1, v))*255));
+        else if(opt.signed) s = (Math.abs(v) < 0.05 ? "0" : v.toFixed(1));
+        else s = v.toFixed(1);
+        g.fillText(s, x*cell + cell/2, y*cell + cell/2 + 1);
+      }
+    }
+  }
+
+  if(opt.box){
+    const b = opt.box;
+    g.strokeStyle = "#e0a500"; g.lineWidth = Math.max(2.5, cell*0.14);
+    g.strokeRect(b.x*cell, b.y*cell, b.w*cell, b.h*cell);
+  }
+  if(opt.dot){
+    g.strokeStyle = "#1f4e79"; g.lineWidth = Math.max(2.5, cell*0.14);
+    g.strokeRect(opt.dot.x*cell, opt.dot.y*cell, cell, cell);
+  }
+}
+
+/* 캔버스 좌표 → 격자 칸 */
+function cellAt(cv, ev, n){
+  const r = cv.getBoundingClientRect();
+  const x = Math.floor((ev.clientX - r.left) / r.width * n);
+  const y = Math.floor((ev.clientY - r.top) / r.height * n);
+  if(x < 0 || y < 0 || x >= n || y >= n) return null;
+  return { x: x, y: y };
+}
+
+/* ═══════════════ 탭 전환 ═══════════════ */
+const TABS = ["pixel","conv","pool","pipe","shift"];
+function showTab(id){
+  TABS.forEach(function(t){ $(t).classList.toggle("on", t === id); });
+  document.querySelectorAll(".side a").forEach(function(a){
+    a.classList.toggle("on", a.dataset.tab === id);
+  });
+  if(id === "conv")  drawConv();
+  if(id === "pool")  drawPool();
+  if(id === "pipe")  drawPipe();
+  if(id === "shift") drawShift();
+}
+document.querySelectorAll(".side a").forEach(function(a){
+  a.addEventListener("click", function(e){ e.preventDefault(); showTab(a.dataset.tab); });
+});
+
+/* ═══════════════ ① 이미지 → 숫자 ═══════════════ */
+const P = { num:true, mode255:false, hover:null };
+
+function setSource(name){
+  SRC.name = name;
+  SRC.data = makeSample(name, SRC.n);
+  if(SRC.invert) invertData();
+  refreshAll();
+}
+function invertData(){
+  for(let i = 0; i < SRC.data.length; i++) SRC.data[i] = 1 - SRC.data[i];
+}
+
+function drawPixel(){
+  const n = SRC.n;
+  $("p_size").textContent = n + " × " + n;
+  $("p_nlab").textContent = n + " × " + n;
+  $("p_len").textContent = n*n;
+
+  drawGrid($("p_grid"), SRC.data, n,
+           { num:P.num, mode255:P.mode255, dot:P.hover, target:460 });
+  $("p_numnote").textContent = (P.num && Math.floor(460/n) < 19)
+    ? "격자가 촘촘해서 숫자를 숨겼습니다. 격자 크기를 20 이하로 줄이면 숫자가 보입니다."
+    : "";
+
+  /* 원본 미리보기 (큰 캔버스) */
+  const dc = $("p_draw"), g = dc.getContext("2d");
+  dc.width = dc.height = 280;
+  const c = 280/n;
+  for(let y = 0; y < n; y++){
+    for(let x = 0; x < n; x++){
+      const v = Math.round(Math.max(0, Math.min(1, SRC.data[idx(x,y,n)]))*255);
+      g.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+      g.fillRect(x*c, y*c, c+1, c+1);
+    }
+  }
+
+  /* Flatten 띠 */
+  const fc = $("p_flat"), fg = fc.getContext("2d");
+  const W = 1000, H = 46;
+  fc.width = W; fc.height = H;
+  fg.fillStyle = "#fff"; fg.fillRect(0, 0, W, H);
+  const total = n*n, cw = W/total;
+  for(let i = 0; i < total; i++){
+    const v = Math.round(Math.max(0, Math.min(1, SRC.data[i]))*255);
+    fg.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+    fg.fillRect(i*cw, 0, Math.ceil(cw), H);
+  }
+  if(P.hover){
+    const k = idx(P.hover.x, P.hover.y, n);
+    fg.strokeStyle = "#e0a500"; fg.lineWidth = 3;
+    fg.strokeRect(k*cw - 1, 1.5, Math.max(3, cw) + 2, H - 3);
+  }
+}
+
+$("p_grid").addEventListener("mousemove", function(ev){
+  P.hover = cellAt($("p_grid"), ev, SRC.n);
+  if(P.hover){
+    const k = idx(P.hover.x, P.hover.y, SRC.n);
+    const v = SRC.data[k];
+    $("p_say").innerHTML =
+      "격자에서 <b>" + (P.hover.y+1) + "행 " + (P.hover.x+1) + "열</b> 의 값 <b>" +
+      (P.mode255 ? Math.round(v*255) : v.toFixed(2)) + "</b> 은, " +
+      "한 줄로 폈을 때 <b>" + (k+1) + "번째</b> 자리로 갑니다." +
+      "<small>MLP는 이 순서만 보고 판단합니다. 위아래로 붙어 있던 픽셀이 " +
+      "한 줄에서는 " + SRC.n + "칸이나 떨어져 버립니다.</small>";
+  }
+  drawPixel();
+});
+$("p_grid").addEventListener("mouseleave", function(){ P.hover = null; drawPixel(); });
+
+/* 직접 그리기 */
+(function(){
+  const dc = $("p_draw");
+  let drawing = false;
+  function paint(ev){
+    const r = dc.getBoundingClientRect();
+    const n = SRC.n;
+    const x = Math.floor((ev.clientX - r.left) / r.width * n);
+    const y = Math.floor((ev.clientY - r.top) / r.height * n);
+    if(x < 0 || y < 0 || x >= n || y >= n) return;
+    for(let dy = -1; dy <= 1; dy++){
+      for(let dx = -1; dx <= 1; dx++){
+        const nx = x+dx, ny = y+dy;
+        if(nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const w = (dx === 0 && dy === 0) ? 1 : 0.45;
+        const k = idx(nx, ny, n);
+        SRC.data[k] = Math.min(1, SRC.data[k] + w);
+      }
+    }
+    refreshAll();
+  }
+  dc.addEventListener("mousedown", function(e){ drawing = true; paint(e); });
+  dc.addEventListener("mousemove", function(e){ if(drawing) paint(e); });
+  window.addEventListener("mouseup", function(){ drawing = false; });
+  dc.addEventListener("mouseleave", function(){ drawing = false; });
+})();
+
+$("p_clear").addEventListener("click", function(){
+  SRC.data = new Float32Array(SRC.n*SRC.n);
+  refreshAll();
+});
+$("p_invert").addEventListener("click", function(){
+  SRC.invert = !SRC.invert; invertData(); refreshAll();
+});
+$("p_samples").addEventListener("click", function(e){
+  const b = e.target.closest("button"); if(!b) return;
+  $("p_samples").querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
+  b.classList.add("on");
+  setSource(b.dataset.s);
+});
+$("p_num").addEventListener("click", function(){
+  P.num = !P.num; this.classList.toggle("on", P.num); drawPixel();
+});
+$("p_255").addEventListener("click", function(){
+  P.mode255 = !P.mode255; this.classList.toggle("on", P.mode255);
+  this.textContent = P.mode255 ? "0~1 로 보기" : "0~255 로 보기";
+  drawPixel();
+});
+$("p_n").addEventListener("input", function(){
+  SRC.n = +this.value;
+  /* 격자 크기가 바뀌면 특징맵·풀링 크기도 함께 바뀌므로, 이전 호버 위치는
+     새 크기에서 더 이상 유효하지 않다. 그대로 두면 ②③ 탭이 범위 밖 좌표로
+     계산을 시도해 -Infinity·NaN을 그대로 보여준다. */
+  C.hover = null; R.hover = null;
+  setSource(SRC.name);
+});
+$("p_file").addEventListener("change", function(){
+  const f = this.files && this.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = function(){
+    const im = new Image();
+    im.onload = function(){
+      SRC.data = imageToArray(im, SRC.n);
+      SRC.name = "upload";
+      if(SRC.invert) invertData();
+      refreshAll();
+    };
+    im.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+});
+
+/* ═══════════════ ② 필터와 합성곱 ═══════════════ */
+const C = { kernel: KERNELS.sobelx.v.slice(), K:3, pad:0, stride:1,
+            hover:null, useRelu:false, scanTimer:null };
+
+function buildKernelBox(){
+  const box = $("c_kbox");
+  box.innerHTML = "";
+  for(let i = 0; i < 9; i++){
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.value = fmt(C.kernel[i]);
+    inp.addEventListener("input", function(){
+      const v = parseFloat(inp.value.replace(",", "."));
+      C.kernel[i] = isFinite(v) ? v : 0;
+      drawConv(); drawPool(); drawPipe();
+    });
+    box.appendChild(inp);
+  }
+}
+function fmt(v){
+  if(Math.abs(v - Math.round(v)) < 1e-6) return String(Math.round(v));
+  return (Math.round(v*100)/100).toString();
+}
+
+function convResult(){
+  return conv2d(SRC.data, SRC.n, C.kernel, C.K, C.stride, C.pad);
+}
+
+function drawConv(){
+  const res = convResult();
+  const shown = C.useRelu ? relu(res.data) : res.data;
+
+  $("c_insz").textContent  = SRC.n + " × " + SRC.n;
+  $("c_outsz").textContent = res.n + " × " + res.n;
+  $("c_e1").textContent = SRC.n; $("c_e2").textContent = C.K;
+  $("c_e3").textContent = C.pad; $("c_e4").textContent = C.stride;
+  $("c_e5").textContent = res.n;
+
+  let box = null;
+  if(C.hover){
+    box = { x: C.hover.x*C.stride - C.pad, y: C.hover.y*C.stride - C.pad, w: C.K, h: C.K };
+  }
+  drawGrid($("c_in"), SRC.data, SRC.n, { num:false, box:box });
+  drawGrid($("c_out"), shown, res.n, { signed:true, num:(res.n <= 14), dot:C.hover });
+
+  if(C.hover) writeCalc(res);
+  else $("c_calc").textContent = "특징맵 위에 마우스를 올려 보세요.";
+}
+
+function writeCalc(res){
+  const h = C.hover;
+  if(!h || h.x >= res.n || h.y >= res.n){ return; }
+
+  const pxRows = [], kRows = [], mulRows = [];
+  let sum = 0;
+  for(let ky = 0; ky < C.K; ky++){
+    let a = "", b = "", c = "";
+    for(let kx = 0; kx < C.K; kx++){
+      const iy = h.y*C.stride + ky - C.pad, ix = h.x*C.stride + kx - C.pad;
+      const px = (iy < 0 || ix < 0 || iy >= SRC.n || ix >= SRC.n) ? 0 : SRC.data[idx(ix, iy, SRC.n)];
+      const kv = C.kernel[ky*C.K + kx];
+      const m = px*kv;
+      sum += m;
+      a += w(px.toFixed(2), 6);
+      b += w(fmt(kv), 5);
+      c += w((Math.abs(m) < 0.005 ? "0" : m.toFixed(2)), 7);
+    }
+    pxRows.push(a); kRows.push(b); mulRows.push(c);
+  }
+
+  let body = "";
+  for(let i = 0; i < C.K; i++){
+    body += " " + pxRows[i] + "    " + kRows[i] + "     " + mulRows[i] + "\n";
+  }
+
+  const out = C.useRelu ? Math.max(0, sum) : sum;
+  $("c_calc").innerHTML =
+    '특징맵 <span class="y">' + (h.y+1) + '행 ' + (h.x+1) + '열</span> 한 칸은 이렇게 만들어집니다.\n\n' +
+    ' <span class="c">입력의 3×3 조각</span>     <span class="y">필터(가중치)</span>      <span class="g">곱한 값</span>\n' +
+    body + '\n' +
+    '  ① 9개를 곱하고  ② 모두 더하면  →  <span class="g">' + sum.toFixed(3) + '</span>\n' +
+    (C.useRelu
+      ? '  ③ ReLU 통과 (음수면 0)        →  <span class="r">' + out.toFixed(3) + '</span>\n'
+      : '') +
+    '\n  이 값 하나가 특징맵의 한 칸  =  <span class="c">' + out.toFixed(3) + '</span>';
+}
+function w(s, n){ s = String(s); while(s.length < n) s = " " + s; return s; }
+
+function cosine(a, b){
+  let d = 0, na = 0, nb = 0;
+  const L = Math.min(a.length, b.length);
+  for(let i = 0; i < L; i++){ d += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  if(na < 1e-9 || nb < 1e-9) return 0;
+  return d / Math.sqrt(na*nb);
+}
+
+$("c_out").addEventListener("mousemove", function(ev){
+  const res = convResult();
+  C.hover = cellAt($("c_out"), ev, res.n);
+  drawConv();
+});
+$("c_out").addEventListener("mouseleave", function(){ C.hover = null; drawConv(); });
+
+$("c_kernels").addEventListener("click", function(e){
+  const b = e.target.closest("button"); if(!b) return;
+  $("c_kernels").querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
+  b.classList.add("on");
+  const k = KERNELS[b.dataset.k];
+  C.kernel = k.v.slice();
+  buildKernelBox();
+  $("c_say").innerHTML = "<b>" + k.name + "</b> — " + k.why;
+  drawConv(); drawPool(); drawPipe();
+});
+$("c_pad").addEventListener("input", function(){
+  C.pad = +this.value; $("c_padlab").textContent = C.pad; C.hover = null; drawConv();
+});
+$("c_st").addEventListener("input", function(){
+  C.stride = +this.value; $("c_stlab").textContent = C.stride; C.hover = null; drawConv();
+});
+$("c_relu").addEventListener("click", function(){
+  C.useRelu = !C.useRelu; this.classList.toggle("on", C.useRelu);
+  this.textContent = C.useRelu ? "ReLU 끄기" : "ReLU 적용";
+  drawConv();
+});
+$("c_scan").addEventListener("click", function(){
+  if(C.scanTimer){ clearInterval(C.scanTimer); C.scanTimer = null; this.textContent = "필터가 지나가는 모습 보기"; return; }
+  const res = convResult();
+  let i = 0;
+  this.textContent = "멈추기";
+  C.scanTimer = setInterval(function(){
+    C.hover = { x: i % res.n, y: Math.floor(i / res.n) };
+    drawConv();
+    i++;
+    if(i >= res.n*res.n){ clearInterval(C.scanTimer); C.scanTimer = null;
+      $("c_scan").textContent = "필터가 지나가는 모습 보기"; }
+  }, 45);
+});
+
+/* ═══════════════ ③ ReLU와 풀링 ═══════════════ */
+const R = { mode:"max", size:2, stride:2, useRelu:true, hover:null };
+
+function poolStage(){
+  const cv = convResult();
+  const after = R.useRelu ? relu(cv.data) : cv.data;
+  const pl = pool2d(after, cv.n, Math.min(R.size, cv.n), Math.min(R.stride, cv.n), R.mode);
+  return { conv: cv, after: after, pool: pl };
+}
+
+function drawPool(){
+  const st = poolStage();
+  $("r_sz1").textContent = st.conv.n + " × " + st.conv.n;
+  $("r_sz2").textContent = st.conv.n + " × " + st.conv.n;
+  $("r_sz3").textContent = st.pool.n + " × " + st.pool.n;
+  $("r_e1").textContent = st.conv.n;
+  $("r_e2").textContent = R.size;
+  $("r_e3").textContent = R.stride;
+  $("r_e4").textContent = st.pool.n;
+  $("r_szlab").textContent = R.size + " × " + R.size;
+  $("r_stlab").textContent = R.stride;
+
+  let box = null;
+  if(R.hover) box = { x: R.hover.x*R.stride, y: R.hover.y*R.stride, w: R.size, h: R.size };
+
+  drawGrid($("r_conv"), st.conv.data, st.conv.n, { signed:true, num:(st.conv.n <= 12) });
+  drawGrid($("r_relu"), st.after,     st.conv.n, { signed:true, num:(st.conv.n <= 12), box:box });
+  drawGrid($("r_pool"), st.pool.data, st.pool.n, { signed:true, num:(st.pool.n <= 12), dot:R.hover });
+
+  /* R.hover가 지금 크기(st.pool.n) 밖을 가리키면(예: 격자 크기를 바꾸기 전의 좌표가
+     남아 있는 경우) 그대로 계산하면 대상 칸이 없어 -Infinity·NaN이 나온다. 안 보여준다. */
+  if(!R.hover || R.hover.x >= st.pool.n || R.hover.y >= st.pool.n){
+    $("r_calc").textContent = "풀링 결과 위에 마우스를 올리면 어느 칸들에서 나왔는지 보여 줍니다.";
+    $("r_kmax").textContent = "–"; $("r_kavg").textContent = "–";
+    $("r_say").innerHTML = "";
+    return;
+  }
+
+  /* 선택한 창의 값들 */
+  const vals = [];
+  for(let ky = 0; ky < R.size; ky++){
+    for(let kx = 0; kx < R.size; kx++){
+      const x = R.hover.x*R.stride + kx, y = R.hover.y*R.stride + ky;
+      if(x < st.conv.n && y < st.conv.n) vals.push(st.after[idx(x, y, st.conv.n)]);
+    }
+  }
+  const mx = Math.max.apply(null, vals);
+  const av = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
+  $("r_kmax").textContent = mx.toFixed(3);
+  $("r_kavg").textContent = av.toFixed(3);
+
+  let grid = "";
+  for(let ky = 0; ky < R.size; ky++){
+    let row = "  ";
+    for(let kx = 0; kx < R.size; kx++){
+      const x = R.hover.x*R.stride + kx, y = R.hover.y*R.stride + ky;
+      const v = (x < st.conv.n && y < st.conv.n) ? st.after[idx(x, y, st.conv.n)] : 0;
+      const s = w(v.toFixed(2), 6);
+      row += (Math.abs(v - mx) < 1e-9 && R.mode === "max")
+             ? '<span class="y">' + s + '</span>   ' : s + "   ";
+    }
+    grid += row + "\n";
+  }
+  const picked = (R.mode === "max") ? mx : av;
+  $("r_calc").innerHTML =
+    '풀링 결과 <span class="c">' + (R.hover.y+1) + '행 ' + (R.hover.x+1) + '열</span> 이 보고 있는 ' +
+    R.size + '×' + R.size + ' 조각\n\n' + grid + "\n" +
+    (R.mode === "max"
+      ? '  Max      → 가장 큰 값 하나만 남긴다  =  <span class="g">' + picked.toFixed(3) + '</span>'
+      : '  Average  → ' + vals.length + '개를 모두 더해 나눈다  =  <span class="g">' + picked.toFixed(3) + '</span>');
+
+  const gap = mx - av;
+  if(R.mode === "max"){
+    $("r_say").className = "say good";
+    $("r_say").innerHTML = "Max는 <b>&quot;이 근처에 그 특징이 있었는가&quot;</b>만 남깁니다." +
+      "<small>같은 자리의 Average는 " + av.toFixed(3) + " 입니다. " +
+      (gap > 0.3 ? "한 칸만 아주 밝아서 두 값의 차이가 큽니다 — 평균을 내면 그 신호가 묻힙니다."
+                 : "값들이 고르게 퍼져 있어 두 방식의 차이가 크지 않습니다.") + "</small>";
+  } else {
+    $("r_say").className = "say warn";
+    $("r_say").innerHTML = "Average는 <b>주변을 섞어 평균</b>을 냅니다." +
+      "<small>같은 자리의 Max는 " + mx.toFixed(3) + " 입니다. " +
+      (gap > 0.3 ? "가장 센 신호가 평균에 묻혀 " + av.toFixed(3) + " 로 약해졌습니다."
+                 : "값이 고르면 Max와 큰 차이가 없습니다.") + "</small>";
+  }
+}
+
+$("r_pool").addEventListener("mousemove", function(ev){
+  const st = poolStage();
+  R.hover = cellAt($("r_pool"), ev, st.pool.n);
+  drawPool();
+});
+$("r_pool").addEventListener("mouseleave", function(){ R.hover = null; drawPool(); });
+
+$("r_mode").addEventListener("click", function(e){
+  const b = e.target.closest("button"); if(!b) return;
+  $("r_mode").querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
+  b.classList.add("on"); R.mode = b.dataset.m; drawPool();
+});
+$("r_size").addEventListener("input", function(){ R.size = +this.value; R.hover = null; drawPool(); });
+$("r_stride").addEventListener("input", function(){ R.stride = +this.value; R.hover = null; drawPool(); });
+$("r_relutog").addEventListener("click", function(){
+  R.useRelu = !R.useRelu; this.classList.toggle("on", R.useRelu);
+  this.textContent = R.useRelu ? "ReLU 켜기" : "ReLU 껐음";
+  R.hover = null; drawPool();
+});
+
+/* ═══════════════ ④ 전체 파이프라인 ═══════════════ */
+const PP = { filters:4 };
+const FILTER_SET = ["sobelx","sobely","lap","sharp","emboss","blur","id","sobelx"];
+
+function tinyCanvas(data, n, signed){
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = n;
+  const g = cv.getContext("2d");
+  const im = g.createImageData(n, n);
+  let m = 1;
+  if(signed){ m = 0; for(let i = 0; i < data.length; i++) m = Math.max(m, Math.abs(data[i])); m = m || 1; }
+  for(let i = 0; i < n*n; i++){
+    let c;
+    if(signed){ const t = Math.max(0, Math.min(1, (data[i]/m + 1)/2)); c = Math.round(t*255); }
+    else c = Math.round(Math.max(0, Math.min(1, data[i]))*255);
+    im.data[i*4] = c; im.data[i*4+1] = c; im.data[i*4+2] = c; im.data[i*4+3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+  return cv;
+}
+
+function pipeCell(data, n, title, sub, signed){
+  const d = document.createElement("div"); d.className = "cell";
+  const big = document.createElement("canvas");
+  big.width = big.height = 96;
+  const bg = big.getContext("2d");
+  bg.imageSmoothingEnabled = false;
+  bg.drawImage(tinyCanvas(data, n, signed), 0, 0, 96, 96);
+  d.appendChild(big);
+  const cap = document.createElement("div"); cap.className = "cap";
+  cap.innerHTML = title + "<span>" + sub + "</span>";
+  d.appendChild(cap);
+  return d;
+}
+function sep(){ const s = document.createElement("div"); s.className = "sep"; s.textContent = "▶"; return s; }
+
+function drawPipe(){
+  const strip = $("pp_strip"); strip.innerHTML = "";
+  const n0 = SRC.n;
+
+  const c1 = conv2d(SRC.data, n0, C.kernel, 3, 1, 1);
+  const r1 = relu(c1.data);
+  const p1 = pool2d(r1, c1.n, 2, 2, "max");
+  const c2 = conv2d(p1.data, p1.n, KERNELS.lap.v, 3, 1, 1);
+  const r2 = relu(c2.data);
+  const p2 = pool2d(r2, c2.n, 2, 2, "max");
+
+  strip.appendChild(pipeCell(SRC.data, n0, "입력 이미지", n0 + "×" + n0 + " × 1장", false));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(c1.data, c1.n, "Conv 3×3", c1.n + "×" + c1.n + " × " + PP.filters + "장", true));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(r1, c1.n, "ReLU", "크기 그대로", true));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(p1.data, p1.n, "MaxPool 2×2", p1.n + "×" + p1.n + " (절반)", true));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(c2.data, c2.n, "Conv 3×3", c2.n + "×" + c2.n + " × " + (PP.filters*2) + "장", true));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(r2, c2.n, "ReLU", "크기 그대로", true));
+  strip.appendChild(sep());
+  strip.appendChild(pipeCell(p2.data, p2.n, "MaxPool 2×2", p2.n + "×" + p2.n + " (또 절반)", true));
+  strip.appendChild(sep());
+
+  const flatLen = p2.n*p2.n*PP.filters*2;
+  const fl = document.createElement("div"); fl.className = "cell";
+  const fc = document.createElement("canvas"); fc.width = 96; fc.height = 96;
+  const fg = fc.getContext("2d");
+  fg.fillStyle = "#fff"; fg.fillRect(0, 0, 96, 96);
+  const cellH = 96/Math.min(48, flatLen);
+  for(let i = 0; i < Math.min(48, flatLen); i++){
+    const v = p2.data[i % p2.data.length] || 0;
+    const t = Math.max(0, Math.min(1, Math.abs(v)/(1e-6 + Math.max.apply(null, Array.from(p2.data).map(Math.abs)))));
+    const c = Math.round(255 - t*180);
+    fg.fillStyle = "rgb(" + c + "," + c + "," + Math.min(255, c + 40) + ")";
+    fg.fillRect(34, i*cellH, 28, Math.max(1, cellH - 0.6));
+  }
+  fg.strokeStyle = "#d7dee6"; fg.strokeRect(34.5, .5, 27, 95);
+  fl.appendChild(fc);
+  const cap = document.createElement("div"); cap.className = "cap";
+  cap.innerHTML = "Flatten → 분류<span>길이 " + flatLen + " → 47종</span>";
+  fl.appendChild(cap);
+  strip.appendChild(fl);
+
+  /* 필터 여러 장 */
+  const maps = $("pp_maps"); maps.innerHTML = "";
+  for(let f = 0; f < Math.min(PP.filters, 8); f++){
+    const kk = KERNELS[FILTER_SET[f]];
+    const cv = conv2d(SRC.data, n0, kk.v, 3, 1, 1);
+    const rv = relu(cv.data);
+    const holder = document.createElement("div");
+    const cnv = document.createElement("canvas");
+    cnv.style.width = "100%"; cnv.style.borderRadius = "8px";
+    cnv.style.border = "1px solid #d7dee6"; cnv.style.display = "block";
+    cnv.style.imageRendering = "pixelated";
+    cnv.width = cnv.height = 160;
+    const g2 = cnv.getContext("2d");
+    g2.imageSmoothingEnabled = false;
+    g2.drawImage(tinyCanvas(rv, cv.n, true), 0, 0, 160, 160);
+    holder.appendChild(cnv);
+    const t = document.createElement("div");
+    t.style.cssText = "font-size:12.5px;font-weight:700;color:#1f4e79;margin-top:5px;text-align:center";
+    t.textContent = "필터 " + (f+1) + " — " + kk.name;
+    holder.appendChild(t);
+    maps.appendChild(holder);
+  }
+
+  /* 파라미터 표 */
+  const px = n0*n0;
+  const mlpP = px*512 + 512;
+  const cnnP = 3*3*1*PP.filters + PP.filters;
+  const tb = $("pp_tbl").querySelector("tbody");
+  tb.innerHTML =
+    '<tr><td><b>MLP</b><br>Linear(' + px + ', 512)</td>' +
+    '<td class="n"><b>' + mlpP.toLocaleString() + '</b> 개</td>' +
+    '<td>펼쳐진 한 줄 전체를 한꺼번에</td></tr>' +
+    '<tr class="hot"><td><b>CNN</b><br>Conv2d(1, ' + PP.filters + ', 3)</td>' +
+    '<td class="n"><b>' + cnnP.toLocaleString() + '</b> 개</td>' +
+    '<td>3×3 이웃만, 대신 전체를 훑으며</td></tr>' +
+    '<tr><td colspan="3">CNN의 파라미터가 약 <b>' +
+    Math.round(mlpP/cnnP).toLocaleString() + '분의 1</b> 입니다.</td></tr>';
+
+  $("pp_code").innerHTML =
+    '<span class="g">self.conv</span> = nn.Sequential(\n' +
+    '    nn.Conv2d(1, ' + PP.filters + ', 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),   <span class="c"># ' +
+        n0 + '×' + n0 + ' → ' + p1.n + '×' + p1.n + '</span>\n' +
+    '    nn.Conv2d(' + PP.filters + ', ' + (PP.filters*2) + ', 3, padding=1), nn.ReLU(), nn.MaxPool2d(2)   <span class="c"># ' +
+        p1.n + '×' + p1.n + ' → ' + p2.n + '×' + p2.n + '</span>\n' +
+    ')\n' +
+    '<span class="g">self.fc</span> = nn.Linear(' + p2.n + ' * ' + p2.n + ' * ' + (PP.filters*2) + ', 47)   ' +
+    '<span class="y"># = ' + flatLen + ' → 47</span>\n\n' +
+    '<span class="r">이 숫자는 외우는 게 아니라 위에서 계산되어 나온 것입니다.</span>';
+}
+
+$("pp_f").addEventListener("input", function(){
+  PP.filters = +this.value; $("pp_flab").textContent = PP.filters; drawPipe();
+});
+
+/* ═══════════════ ⑤ 이동 불변성 ═══════════════ */
+const S2 = { dx:0, dy:0 };
+
+function drawShift(){
+  const n = SRC.n;
+  const moved = shiftImage(SRC.data, n, S2.dx, S2.dy);
+
+  drawGrid($("s_orig"), SRC.data, n, { num:false });
+  drawGrid($("s_move"), moved,    n, { num:false });
+
+  /* 패딩 1 로 합성곱하면 크기가 그대로라, 입력을 옮긴 만큼 특징맵도 그대로 옮겨진다 */
+  const kern = C.kernel;
+  const c0 = conv2d(SRC.data, n, kern, 3, 1, 1);
+  const c1 = conv2d(moved,    n, kern, 3, 1, 1);
+  const f0 = relu(c0.data), f1 = relu(c1.data);
+
+  drawGrid($("s_f0"),   f0, c0.n, { signed:true, num:false });
+  drawGrid($("s_feat"), f1, c1.n, { signed:true, num:false });
+
+  /* ① MLP 관점 : 펼친 픽셀 벡터끼리 그대로 견준다 */
+  const mlpSim = cosine(SRC.data, moved) * 100;
+
+  /* ② CNN 관점 : 특징맵을 옮긴 만큼 되돌려 놓고 견준다 (모양이 유지되는가) */
+  const aligned = shiftImage(f1, c1.n, -S2.dx, -S2.dy);
+  const cnnSim = cosine(f0, aligned) * 100;
+
+  /* ③ 풀링을 지나면 옮겨진 칸 수 자체가 절반으로 줄어든다 */
+  const movedCells = Math.max(Math.abs(S2.dx), Math.abs(S2.dy));
+  const afterPool = Math.round(movedCells / 2);
+
+  $("s_mlp").textContent = mlpSim.toFixed(0) + " %";
+  $("s_cnn").textContent = cnnSim.toFixed(0) + " %";
+  $("s_dxlab").textContent = S2.dx + " 칸";
+  $("s_dylab").textContent = S2.dy + " 칸";
+
+  if(S2.dx === 0 && S2.dy === 0){
+    $("s_say").className = "say";
+    $("s_say").innerHTML = "슬라이더로 글자를 옮겨 보세요." +
+      "<small>한 칸만 옮겨도 왼쪽 숫자가 얼마나 떨어지는지 보시면 됩니다.</small>";
+  } else if(cnnSim - mlpSim > 8){
+    $("s_say").className = "say good";
+    $("s_say").innerHTML =
+      "픽셀로 견주면 <b>" + mlpSim.toFixed(0) + "%</b> 까지 떨어졌지만, " +
+      "CNN이 뽑아낸 특징의 모양은 <b>" + cnnSim.toFixed(0) + "% 그대로</b>입니다." +
+      "<small><b>같은 필터가 이미지 전체를 훑기 때문(가중치 공유)</b>입니다. " +
+      "그래서 특징맵은 사라지지 않고 <b>똑같은 모양으로 함께 " + movedCells + "칸 옮겨질 뿐</b>입니다.<br>" +
+      "여기에 2×2 풀링을 한 번 지나면 그 어긋남이 <b>" + movedCells + "칸 → " + afterPool +
+      "칸</b>으로 줄고, 한 번 더 지나면 또 절반이 됩니다. " +
+      "층을 지날수록 &#39;어디에 있었는지&#39;는 흐려지고 &#39;무엇이 있었는지&#39;만 남는 것입니다.<br>" +
+      "반면 MLP는 이 한 줄이 <b>통째로 다른 입력</b>으로 바뀐 것으로 받아들입니다.</small>";
+  } else {
+    $("s_say").className = "say warn";
+    $("s_say").innerHTML =
+      "많이 옮기면 CNN도 흔들립니다. (특징 유지 " + cnnSim.toFixed(0) + "%)" +
+      "<small>그림이 화면 밖으로 잘려 나가면 특징 자체가 사라지기 때문입니다. " +
+      "이동에 강하다는 것은 <b>작은</b> 이동에 대한 이야기이고, 실제 학습에서는 " +
+      "일부러 조금씩 옮긴 이미지를 함께 학습시켜(데이터 증강) 더 튼튼하게 만듭니다.</small>";
+  }
+}
+
+$("s_dx").addEventListener("input", function(){ S2.dx = +this.value; drawShift(); });
+$("s_dy").addEventListener("input", function(){ S2.dy = +this.value; drawShift(); });
+$("s_reset").addEventListener("click", function(){
+  S2.dx = S2.dy = 0; $("s_dx").value = 0; $("s_dy").value = 0; drawShift();
+});
+
+/* ═══════════════ 시작 ═══════════════ */
+function refreshAll(){
+  drawPixel();
+  drawConv(); drawPool(); drawPipe(); drawShift();
+}
+
+buildKernelBox();
+$("c_say").innerHTML = "<b>" + KERNELS.sobelx.name + "</b> — " + KERNELS.sobelx.why;
+setSource("seven");
+showTab("pixel");
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+[build]
+  publish = "."
+
+# 단일 정적 HTML — 별도 빌드 명령 없음
