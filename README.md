@@ -11,11 +11,6 @@
 2. **Settings → Pages → Source**를 `main` 브랜치 / `/ (root)`로 설정
 3. `https://<사용자명>.github.io/<저장소명>/` 에서 접속
 
-### Netlify
-1. Netlify에서 **Add new site → Import an existing project**로 이 저장소 연결
-2. Build command 없음, Publish directory는 `/` (root)
-3. 자동 배포 완료
-
 ## 파일 구조
 
 - `index.html` — 시뮬레이터 본체 (모든 스타일·스크립트 포함)
@@ -23,4 +18,4 @@
 
 ## 라이선스
 
-교육용으로 자유롭게 사용 가능합니다.
+교육용, KERIS 한국교육학술정부원 교원연수 자료를 웹으로 반영
